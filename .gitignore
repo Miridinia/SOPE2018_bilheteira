@@ -1,3 +1,8 @@
+# Executables
+src/client
+src/start
+src/server
+
 # Prerequisites
 *.d
 
