@@ -89,22 +89,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
-
-// uncomment this line to enable passing invalid arguments to client processes
-// (or define it through command line/Makefile)
-//#define ADDITIONAL_CHECK
-
-#define MAX_ROOM_SEATS 9999             /* maximum number of room seats/tickets available       */
-#define MAX_CLI_SEATS 99                /* maximum number of seats/tickets per request          */
-#define WIDTH_PID 5                     /* length of the PID string                             */
-#define WIDTH_XXNN 5                    /* length of the XX.NN string (reservation X out of N)  */
-#define WIDTH_SEAT 4                    /* length of the seat number id string                  */
-
-// maximum length of the preference list string (the +1 is for the space character)
-#define MAX_PREFERENCES_LEN ((WIDTH_SEAT+1)*(MAX_CLI_SEATS))
-
-#define MAX_TOKEN_LEN 1024              /* length of the largest string within config file      */
-#define PREF_LIST_END "END"             /* terminator string for the list of seat preferences   */
+#include "ticket.h"
 
 
 // macro to quote ("stringify") a value
@@ -523,6 +508,7 @@ static int read_client_info(struct client_info *ci) {
 static pid_t create_client_process(const struct client_info *ci) {
   char num_wanted_seats[WIDTH_SEAT+1];
   char preferences[MAX_PREFERENCES_LEN];
+  char time_out[CLIENT_TIMEOUT_LEN+1];
   pid_t pid;
   int i, idx;
   
@@ -536,6 +522,9 @@ static pid_t create_client_process(const struct client_info *ci) {
     
     /* child */
     case 0:
+
+      // create the argument string that holds the timeout number
+      sprintf(time_out, "%d", CLIENT_TIMEOUT);
       // create the argument string that holds the number of seats/tickets wanted
       sprintf(num_wanted_seats, "%d", ci->num_wanted_seats);
 
@@ -547,7 +536,7 @@ static pid_t create_client_process(const struct client_info *ci) {
       preferences[idx-1] = '\0';
 
       // execute client process
-      execlp("./client", "./client", num_wanted_seats, preferences, NULL);
+      execlp("./client", "./client", time_out, num_wanted_seats, preferences, NULL);
 
       //
       // code only reaches here if execlp failed

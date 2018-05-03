@@ -3,6 +3,9 @@ src/client
 src/start
 src/server
 
+# Vscode
+.vscode/
+
 # Prerequisites
 *.d
 
