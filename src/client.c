@@ -23,6 +23,7 @@ void print_args(struct client_args_t * args);
 void createFIFO(const char *pathname);
 int openFIFO(const char *pathname, mode_t mode);
 void writeOnFIFO(int fd, char *message, int messagelen);
+int readOnFIFO(int fd, char *str);
 void closeFIFO(int fd);
 void killFIFO(char *pathname);
 
@@ -93,6 +94,15 @@ void writeOnFIFO(int fd, char *message, int messagelen) {
 		exit(0);
 	}
 	printf("ENVIOU: %s\n", message);
+}
+
+int readOnFIFO(int fd, char *str) {
+	int n; 
+	do {
+		n = read(fd,str,1);     
+	} while (n>0 && *str++ != '\0'); 
+
+	return (n>0); 
 }
 
 void closeFIFO(int fd) {
