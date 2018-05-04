@@ -12,8 +12,8 @@ server.o: server.c
 server: server.o
 	$(CC) server.o -o server
 
-start.o: start.c
-	$(CC) -c start.c -o start.o
+start.o: start_v2.c
+	$(CC) -c start_v2.c -o start.o
 start: start.o 
 	$(CC) start.o -o start
 
