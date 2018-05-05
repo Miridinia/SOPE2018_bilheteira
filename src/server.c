@@ -6,16 +6,13 @@
 #include <signal.h>
 #include <sys/file.h> 
 #include <sys/stat.h>
+#include <pthread.h> 
 
 #include "ticket.h"
 // $ server <num_room_seats> <num_ticket_offices> <open_time>
 
-//
-static void ALARMhandler(int sig)
-{
-    printf("Bilheteiras fechadas!\n");
-    exit(0);
-}
+
+
 
 struct server_args_t {
 	int num_room_seats;
@@ -31,12 +28,20 @@ void writeOnFIFO(int fd, char *message, int messagelen);
 int readOnFIFO(int fd, char *str);
 void closeFIFO(int fd);
 void killFIFO(char *pathname);
+void *printHello(void *threadId);
+
+static void ALARMhandler(int sig)
+{
+	printf("Ticket Office Closed!\n");
+	killFIFO(FIFO_NAME_CONNECTION);
+	exit(0);
+}
 
 int main(int argc, char *argv[]) {
-  printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
+	printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
 
-  if (argc == 4) {
-    printf("ARGS: %s | %s | %s\n", argv[1], argv[2], argv[3]);
+	if (argc == 4) {
+		printf("ARGS: %s | %s | %s\n", argv[1], argv[2], argv[3]);
 	} else {
 		return -1;
 	}
@@ -45,25 +50,40 @@ int main(int argc, char *argv[]) {
 
 	parse_args(argv, &args);
 
-	//creating alarm for the open time of the bilheiteiras
-	signal(SIGALRM, ALARMhandler);
-    alarm(args.open_time);
-
 	print_args(&args);
 
 	createFIFO(FIFO_NAME_CONNECTION);
 
+		//creating Bilheteiras
+	pthread_t tid[args.num_ticket_offices]; 
+	int rc, t; 
+	int thrArg[args.num_ticket_offices]; 
+	for(t=1; t<= args.num_ticket_offices; t++){ 
+		thrArg[t-1] = t; 
+		rc = pthread_create(&tid[t-1], NULL, printHello, &thrArg[t-1]);
+		if (rc) { 
+			printf("ERROR; return code from pthread_create() is %d\n", rc); 
+			exit(1); 
+		} 
+	} 
+
+	//creating alarm for the open time of the bilheiteiras
+	signal(SIGALRM, ALARMhandler);
+	alarm(args.open_time);
+
+	//creating FIFO
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_RDONLY);
-	char  str[100];
+	char str[100];
 	while(readOnFIFO(fd, str)) 
-		printf("%s\n", str);
+		printf("%s \n", str);
+
 
 	closeFIFO(fd);
 	killFIFO(FIFO_NAME_CONNECTION);
 
-  	sleep(111);
+	sleep(111);
 
-  //return 0;
+	  //return 0;
 }
 
 void parse_args(char* argv[], struct server_args_t * args) {
@@ -78,6 +98,12 @@ void print_args(struct server_args_t * args) {
 	printf("Open Time: %d\n", args->open_time);
 	printf("\n");
 }
+
+void *printHello(void *threadId) { 
+ 	printf("Ticket Office nº %2d: Created\n", *(int*)threadId); 
+
+  	pthread_exit(NULL); 
+} 
 
 int char_to_int(char* to_convert) {
 	int converted = atoi(to_convert);

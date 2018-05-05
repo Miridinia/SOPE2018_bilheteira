@@ -1,4 +1,4 @@
-CC = gcc
+CC = gcc -Wall -pthread 
 
 default: client start server
 
