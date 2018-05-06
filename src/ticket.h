@@ -19,6 +19,7 @@
 #define MAX_TOKEN_LEN 1024              /* length of the largest string within config file      */
 #define PREF_LIST_END "END"             /* terminator string for the list of seat preferences   */
 #define PERMISSIONS_FIFO 0660
+#define MAX_WAITING_LIST 10
 
 
 // para bilheteiras

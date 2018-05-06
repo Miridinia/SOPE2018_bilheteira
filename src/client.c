@@ -45,22 +45,25 @@ int main(int argc, char *argv[]) {
 	//The requests fifos will be created by the server
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_WRONLY);
 	char msg[MAX_TOKEN_LEN];
-	strcpy(msg, " ");
-	printf("msg: %s \n", msg);
+
 	char pid[MAX_TOKEN_LEN];
 	sprintf(pid, "%d", getpid());
 
 	strcat(msg, pid);
-	printf("msg: %s \n", msg);
 	strcat(msg, " ");
 
-	printf("msg: %s \n", msg);
 	char num_wanted_seats[MAX_TOKEN_LEN];
-	printf("%d\n", args.num_wanted_seats);
 	sprintf(num_wanted_seats, "%d", args.num_wanted_seats);
-
 	strcat(msg, num_wanted_seats);
-	printf("aaaaa: %s \n", msg);
+
+	
+	int i;
+	for(i=0; i<args.num_pref_seats; i++) {
+		strcat(msg, " ");
+		char seat[MAX_TOKEN_LEN];
+		sprintf(seat, "%d", args.pref_seat_list[i]);
+		strcat(msg, seat);
+	}
 
 	int msglen = strlen(msg)+1;
 	writeOnFIFO(fd, msg, msglen);
