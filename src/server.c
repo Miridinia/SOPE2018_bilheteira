@@ -60,6 +60,8 @@ static void ALARMhandler(int sig)
 	int res;
 	printf("Ticket Office Closed!\n");
 	killFIFO(FIFO_NAME_CONNECTION);
+	res = pthread_mutex_unlock(&mutex);
+	checkResult("pthread_mutex_unlock()\n", res);
 	res = pthread_cond_destroy(&cond);
 	checkResult("pthread_cond_destroy()\n", res);
 	res = pthread_mutex_destroy(&mutex);
@@ -119,20 +121,22 @@ int main(int argc, char *argv[]) {
 	while(1) {
 
 		char str[100];
-		while(readOnFIFO(fd, str) && check == 0) {
+		if(readOnFIFO(fd, str) && check == 0) {
 			check = 1;
 			printf("%s \n", str);
 		} 
 		if(check) {
 			message = str;
 			conditionMet = 1;
-			res = pthread_cond_broadcast(&cond); //send everyone a message
-			checkResult("pthread_cond_broadcast()\n", res);
-			res = pthread_mutex_unlock(&mutex);
-			checkResult("pthread_mutex_unlock()\n", res);
-			printf("Main thread: waiting for threads and cleanup\n");
-			
 			while(conditionMet != 0){
+				res = pthread_cond_broadcast(&cond); //send everyone a message
+				checkResult("pthread_cond_broadcast()\n", res);
+				res = pthread_mutex_unlock(&mutex);
+				checkResult("pthread_mutex_unlock()\n", res);
+				if(conditionMet != 0) {
+					res = pthread_mutex_lock(&mutex); //making everything sleep??
+					checkResult("pthread_mutex_lock()\n", res);
+				}
 				//printf("esperando...\n");
 			}
 			check = 0;
@@ -189,24 +193,43 @@ void *bilheteira(void *threadId) {
  	printf("Ticket Office nº %2d: Created\n", threadNum); 
 	
 	//receiving the message
-	
+	int lol = 0;
 	while(1) {
-		char msggg[MAX_TOKEN_LEN];
 		printf("Thread %d blocked because condition is not met\n", threadNum);
-		conditionMet = 0;
+		res = pthread_mutex_lock(&mutex);
+		checkResult("pthread_mutex_lock()\n", res);
 		res = pthread_cond_wait(&cond, &mutex);
 		checkResult("pthread_cond_wait()\n", res);
 		if(conditionMet == 1) {
-			conditionMet = 2;
-			strcpy(msggg, message);
-				
+			//ZONA CRíTICA!!!!!!
 			printf("Thread %d executing critical section for 1 seconds ...\n",threadNum);
-			printf("\n\n*************RECEBEU**********************\n");
-			printf("bilheteira: %i, recebeu %s\n", threadNum, msggg);
-			printf("******************************************\n\n\n");
-			sleep(1);			
-		}	
+			res = pthread_mutex_unlock(&mutex);
+			checkResult("pthread_mutex_unlock()\n", res);
 
+			res = pthread_mutex_lock(&mutex);
+			checkResult("pthread_mutex_lock()\n", res);
+			conditionMet = 0;
+			struct client_args_t data;
+			read_msg(message, &data);
+			
+			lol = 1;
+			res = pthread_mutex_unlock(&mutex);
+			checkResult("pthread_mutex_unlock()\n", res);
+			//FIM ZONA CRÍTICA!!!
+			sleep(1);			
+			printf("\n\n*************RECEBEU**********************\n");
+			printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
+			printf("******************************************\n\n\n");
+				
+		
+		}
+		if(lol == 1){
+			lol = 0;
+		}	else {
+			res = pthread_mutex_unlock(&mutex);
+			checkResult("pthread_mutex_unlock()\n", res);
+			sleep(1);
+		}
 	}
 } 
 
