@@ -7,6 +7,9 @@
 #include <sys/file.h> 
 #include <sys/stat.h>
 #include <pthread.h> 
+#include <mqueue.h>
+#include <semaphore.h>
+#include <errno.h>
 
 #include "ticket.h"
 // $ server <num_room_seats> <num_ticket_offices> <open_time>
@@ -39,25 +42,37 @@ int readOnFIFO(int fd, char *str);
 void closeFIFO(int fd);
 void killFIFO(char *pathname);
 void *bilheteira(void *threadId);
+void checkResult(char *string, int err);
 
 int isSeatFree(Seat *seats, int seatNum);
 void bookSeat(Seat *seats, int seatNum, int clientId);
 void freeSeat(Seat *seats, int seatNum);
 
+//Globals
+Seat seats;
+int conditionMet = 0;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+char *message;
+
 static void ALARMhandler(int sig)
 {
+	int res;
 	printf("Ticket Office Closed!\n");
 	killFIFO(FIFO_NAME_CONNECTION);
+	res = pthread_cond_destroy(&cond);
+	checkResult("pthread_cond_destroy()\n", res);
+	res = pthread_mutex_destroy(&mutex);
+	checkResult("pthread_mutex_destroy()\n", res);
 	exit(0);
 }
 
-//Globals
-Seat seats;
-char* messages[MAX_WAITING_LIST];
-int msg_count = 0;
+
 
 int main(int argc, char *argv[]) {
 	printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
+
+	int res; //????
 
 	if (argc == 4) {
 		printf("ARGS: %s | %s | %s\n", argv[1], argv[2], argv[3]);
@@ -96,16 +111,33 @@ int main(int argc, char *argv[]) {
 
 	//creating FIFO
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_RDONLY);
-
+	sleep(1); //to wait threads for doing something??
+	
+	int check = 0;
+	res = pthread_mutex_lock(&mutex); //making everything sleep??
+	checkResult("pthread_mutex_lock()\n", res);
 	while(1) {
-		char str[100];
-		while(readOnFIFO(fd, str)) 
-		printf("%s \n", str);
 
-		//defining the msg
-		//messages[msg_count] = malloc(sizeof(char));
-		//messages[msg_count] = (char *) str;
-		msg_count++;
+		char str[100];
+		while(readOnFIFO(fd, str) && check == 0) {
+			check = 1;
+			printf("%s \n", str);
+		} 
+		if(check) {
+			message = str;
+			conditionMet = 1;
+			res = pthread_cond_broadcast(&cond); //send everyone a message
+			checkResult("pthread_cond_broadcast()\n", res);
+			res = pthread_mutex_unlock(&mutex);
+			checkResult("pthread_mutex_unlock()\n", res);
+			printf("Main thread: waiting for threads and cleanup\n");
+			
+			while(conditionMet != 0){
+				//printf("esperando...\n");
+			}
+			check = 0;
+		}
+
 	}
 	
 
@@ -120,8 +152,6 @@ int main(int argc, char *argv[]) {
 
 	closeFIFO(fd);
 	killFIFO(FIFO_NAME_CONNECTION);
-
-	sleep(111);
 
 	  //return 0;
 }
@@ -154,25 +184,39 @@ void print_args(struct server_args_t * args) {
 }
 
 void *bilheteira(void *threadId) { 
-
-
- 	printf("Ticket Office nº %2d: Created\n", *(int*)threadId); 
+	int res;
+	int threadNum = *(int*)threadId;
+ 	printf("Ticket Office nº %2d: Created\n", threadNum); 
 	
 	//receiving the message
-	while(1) {
-		if(msg_count != 0) {
-			
-			/*struct client_args_t reservation;
-			read_msg(messages[msg_count], &reservation);
-			printf("Bilheteira %i leu: %s\n", *(int*) threadId, messages[msg_count]);
-			msg_count--;*/
-		}
-		sleep(1);
-	}
 	
-  	
+	while(1) {
+		char msggg[MAX_TOKEN_LEN];
+		printf("Thread %d blocked because condition is not met\n", threadNum);
+		conditionMet = 0;
+		res = pthread_cond_wait(&cond, &mutex);
+		checkResult("pthread_cond_wait()\n", res);
+		if(conditionMet == 1) {
+			conditionMet = 2;
+			strcpy(msggg, message);
+				
+			printf("Thread %d executing critical section for 1 seconds ...\n",threadNum);
+			printf("\n\n*************RECEBEU**********************\n");
+			printf("bilheteira: %i, recebeu %s\n", threadNum, msggg);
+			printf("******************************************\n\n\n");
+			sleep(1);			
+		}	
 
+	}
 } 
+
+void checkResult(char *string, int err) {
+	if(err != 0) {
+		printf("Error %d on %s\n", err, string);
+		exit(EXIT_FAILURE);
+	}
+	return;
+}
 
 int char_to_int(char* to_convert) {
 	int converted = atoi(to_convert);

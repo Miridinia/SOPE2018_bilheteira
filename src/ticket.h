@@ -20,6 +20,7 @@
 #define PREF_LIST_END "END"             /* terminator string for the list of seat preferences   */
 #define PERMISSIONS_FIFO 0660
 #define MAX_WAITING_LIST 10
+#define SHARED 0						 /* sem. is shared between threads */
 
 
 // para bilheteiras

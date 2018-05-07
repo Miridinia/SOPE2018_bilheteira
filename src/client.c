@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 		sprintf(seat, "%d", args.pref_seat_list[i]);
 		strcat(msg, seat);
 	}
-
+	strcat(msg, "\0");
 	int msglen = strlen(msg)+1;
 	writeOnFIFO(fd, msg, msglen);
 
