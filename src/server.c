@@ -43,6 +43,7 @@ void closeFIFO(int fd);
 void killFIFO(char *pathname);
 void *bilheteira(void *threadId);
 void checkResult(char *string, int err);
+void initSeats(int num);
 
 int isSeatFree(Seat *seats, int seatNum);
 void bookSeat(Seat *seats, int seatNum, int clientId);
@@ -90,6 +91,7 @@ int main(int argc, char *argv[]) {
 
 	//define Seat
 	seats.num_room_seats = args.num_room_seats;
+	initSeats(seats.num_room_seats);
 
 	//Creats fifo requests
 	createFIFO(FIFO_NAME_CONNECTION);
@@ -289,4 +291,26 @@ void killFIFO(char *pathname) {
 		printf("ERROR: COULDN'T DESTROY FIFO\n");
 		exit(0);
 	}
+}
+
+void initSeats(int num){ //inicializar a 0 o array com num de comprimento
+	seats.seats_taken = malloc(sizeof(int) * num);
+	memset(seats.seats_taken, 0, sizeof(int)*num);
+
+}
+
+int isSeatFree(Seat *seats, int seatNum){//caso esteja livre o valor que aparece é 0, se estiver ocupado aparece o clienteId
+
+	if(seats->seats_taken[seatNum]==0){
+		return 0;
+	}
+	else return seats->seats_taken[seatNum];
+}
+
+void bookSeat(Seat *seats, int seatNum, int clientId){
+	seats->seats_taken[seatNum]=clientId;
+}
+
+void freeSeat(Seat *seats, int seatNum){
+	seats->seats_taken[seatNum]=0;
 }
