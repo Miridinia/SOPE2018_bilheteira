@@ -4,9 +4,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/file.h> 
+#include <sys/file.h>
 #include <sys/stat.h>
-#include <pthread.h> 
+#include <pthread.h>
 #include <mqueue.h>
 #include <semaphore.h>
 #include <errno.h>
@@ -74,9 +74,7 @@ static void ALARMhandler(int sig)
 
 int main(int argc, char *argv[]) {
 	printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
-
 	int res; //????
-
 	if (argc == 4) {
 		printf("ARGS: %s | %s | %s\n", argv[1], argv[2], argv[3]);
 	} else {
@@ -97,17 +95,17 @@ int main(int argc, char *argv[]) {
 	createFIFO(FIFO_NAME_CONNECTION);
 
 	//creating Bilheteiras
-	pthread_t tid[args.num_ticket_offices]; 
-	int rc, t; 
-	int thrArg[args.num_ticket_offices]; 
-	for(t=1; t<= args.num_ticket_offices; t++){ 
-		thrArg[t-1] = t; 
+	pthread_t tid[args.num_ticket_offices];
+	int rc, t;
+	int thrArg[args.num_ticket_offices];
+	for(t=1; t<= args.num_ticket_offices; t++){
+		thrArg[t-1] = t;
 		rc = pthread_create(&tid[t-1], NULL, bilheteira, &thrArg[t-1]);
-		if (rc) { 
-			printf("ERROR; return code from pthread_create() is %d\n", rc); 
-			exit(1); 
-		} 
-	} 
+		if (rc) {
+			printf("ERROR; return code from pthread_create() is %d\n", rc);
+			exit(1);
+		}
+	}
 
  	//creating alarm for the open time of the bilheiteiras
 	signal(SIGALRM, ALARMhandler);
@@ -116,7 +114,7 @@ int main(int argc, char *argv[]) {
 	//creating FIFO
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_RDONLY);
 	sleep(1); //to wait threads for doing something??
-	
+
 	int check = 0;
 	res = pthread_mutex_lock(&mutex); //making everything sleep??
 	checkResult("pthread_mutex_lock()\n", res);
@@ -126,7 +124,7 @@ int main(int argc, char *argv[]) {
 		if(readOnFIFO(fd, str) && check == 0) {
 			check = 1;
 			printf("%s \n", str);
-		} 
+		}
 		if(check) {
 			message = str;
 			conditionMet = 1;
@@ -145,7 +143,7 @@ int main(int argc, char *argv[]) {
 		}
 
 	}
-	
+
 
 	//teste
 	/*printf("PID: %d\n", reservation.pid);
@@ -163,13 +161,20 @@ int main(int argc, char *argv[]) {
 }
 
 void read_msg(char *msg, struct client_args_t * args) {
+
 	args->num_pref_seats = 0;
 	char* next_seat = strtok(msg, " ");
 	sscanf(next_seat, "%d", &(args->pid));
+
+
 	next_seat = strtok(NULL, " ");
 	sscanf(next_seat, "%d", &(args->num_wanted_seats));
+
+
 	next_seat = strtok(NULL, " ");
+
 	while(next_seat != NULL) {
+
 		sscanf(next_seat, "%d", &(args->pref_seat_list[args->num_pref_seats]));
 		args->num_pref_seats++;
 		next_seat = strtok(NULL, " ");
@@ -189,11 +194,11 @@ void print_args(struct server_args_t * args) {
 	printf("\n");
 }
 
-void *bilheteira(void *threadId) { 
+void *bilheteira(void *threadId) {
 	int res;
 	int threadNum = *(int*)threadId;
- 	printf("Ticket Office nº %2d: Created\n", threadNum); 
-	
+ 	printf("Ticket Office nº %2d: Created\n", threadNum);
+
 	//receiving the message
 	int lol = 0;
 	while(1) {
@@ -213,17 +218,96 @@ void *bilheteira(void *threadId) {
 			conditionMet = 0;
 			struct client_args_t data;
 			read_msg(message, &data);
-			
+
+			if(data.num_wanted_seats> MAX_CLI_SEATS || data.num_wanted_seats<1){
+									//enviar resposta cliente -1
+									printf("\n\n------ERROR -1-------\n");
+			}
+			if(data.num_wanted_seats> data.num_pref_seats || data.num_wanted_seats<1){
+									//enviar resposta cliente -4
+									printf("\n\n------ERROR -4--------- \n");
+			}
+
+			int indexSeats=0;
+			int total=0;
+
+			int done=0; //bool
+			int reserveDone=0; //bool
+
+			int *reserveSeats = malloc(sizeof(int) * data.num_wanted_seats);
+
+			while(!done && indexSeats<data.num_pref_seats){
+					printf("Index: %i\n",indexSeats);
+					printf("Data pref seats: %i\n",data.num_pref_seats);
+					printf("Data wanted seats: %i\n",data.num_wanted_seats);
+					printf("Seats Numero de room seats: %i\n",seats.num_room_seats);
+					printf("Current Seat: %i\n",data.pref_seat_list[indexSeats]);
+
+
+					if(data.pref_seat_list[indexSeats]> seats.num_room_seats || data.pref_seat_list[indexSeats]<1){
+						//enviar resposta cliente -3
+						printf("\n\n------ERROR -3--------- \n");
+					}
+
+					if(isSeatFree(&seats , data.pref_seat_list[indexSeats])==0){
+						bookSeat(&seats,data.pref_seat_list[indexSeats],data.pid);
+						reserveSeats[total]=data.pref_seat_list[indexSeats];
+						printf("Atendeu lugar: %i\n",data.pref_seat_list[indexSeats]);
+						total++;
+					}
+					else{
+						printf("Lugar %i ocupado\n",data.pref_seat_list[indexSeats]);
+					}
+
+					indexSeats++;
+					if(total == data.num_wanted_seats){
+						reserveDone=1;
+						done=1;
+					}
+
+			}
+			if(reserveDone){
+				int n;
+				for(n=0;n<total;n++){
+					printf("RESERVOU: %i\n",reserveSeats[n]);
+					//enviar mensagem de sucesso cliente
+				}
+					printf("\n\n");
+			}
+			else{
+				printf("NAO RESERVOU\n");
+				if(total== 0){
+					//enviar resposta cliente -6
+					printf("\n\n------ERROR -6--------- \n");
+				}
+				else{
+					//enviar resposta cliente -5
+					printf("\n\n------ERROR -5--------- \n");
+					int ni;
+					for(ni=0;ni<total;ni++){
+					printf("Lugar %i reservado, irá ser apagado\n",reserveSeats[ni]);
+					freeSeat(&seats,reserveSeats[ni]);
+				}
+				}
+					printf("\n\n");
+			}
+			indexSeats=0;
+			total=0;
+
+			done=0; //bool
+			reserveDone=0; //bool
+
+			free(reserveSeats);
+
 			lol = 1;
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
 			//FIM ZONA CRÍTICA!!!
-			sleep(1);			
-			printf("\n\n*************RECEBEU**********************\n");
-			printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
-			printf("******************************************\n\n\n");
-				
-		
+			sleep(1);
+				printf("\n\n*************RECEBEU**********************\n");
+				printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
+				printf("******************************************\n\n\n");
+
 		}
 		if(lol == 1){
 			lol = 0;
@@ -233,7 +317,7 @@ void *bilheteira(void *threadId) {
 			sleep(1);
 		}
 	}
-} 
+}
 
 void checkResult(char *string, int err) {
 	if(err != 0) {
@@ -252,11 +336,11 @@ void createFIFO(const char *pathname) {
 	if(mkfifo(pathname , PERMISSIONS_FIFO) != 0){
 		printf("ERROR: COULDN'T CREATE FIFO\n");
 		exit(0);
-	}	
+	}
 }
 
 int openFIFO(const char *pathname, mode_t mode) {
-	int fd = open(pathname, mode); 
+	int fd = open(pathname, mode);
 	if(fd == -1) {
 		printf("ERROR: COULDNT OPEN FIFO\n");
 	}
@@ -271,12 +355,12 @@ void writeOnFIFO(int fd, char *message, int messagelen) {
 }
 
 int readOnFIFO(int fd, char *str) {
-	int n; 
+	int n;
 	do {
-		n = read(fd,str,1);     
-	} while (n>0 && *str++ != '\0'); 
+		n = read(fd,str,1);
+	} while (n>0 && *str++ != '\0');
 
-	return (n>0); 
+	return (n>0);
 }
 
 void closeFIFO(int fd) {
@@ -300,7 +384,7 @@ void initSeats(int num){ //inicializar a 0 o array com num de comprimento
 }
 
 int isSeatFree(Seat *seats, int seatNum){//caso esteja livre o valor que aparece é 0, se estiver ocupado aparece o clienteId
-
+	sleep(1);
 	if(seats->seats_taken[seatNum]==0){
 		return 0;
 	}
@@ -308,9 +392,12 @@ int isSeatFree(Seat *seats, int seatNum){//caso esteja livre o valor que aparece
 }
 
 void bookSeat(Seat *seats, int seatNum, int clientId){
+	sleep(1);
 	seats->seats_taken[seatNum]=clientId;
 }
 
 void freeSeat(Seat *seats, int seatNum){
+	sleep(1);
 	seats->seats_taken[seatNum]=0;
 }
+
