@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/file.h> 
+#include <signal.h>
 
 #include "ticket.h"
 
@@ -18,6 +19,8 @@ struct client_args_t {
 	int num_pref_seats;
 };
 
+char * fifoNameHandler;
+
 void parse_args(char *argv[], struct client_args_t * args);
 void print_args(struct client_args_t * args);
 void createFIFO(const char *pathname);
@@ -26,6 +29,12 @@ void writeOnFIFO(int fd, char *message, int messagelen);
 int readOnFIFO(int fd, char *str);
 void closeFIFO(int fd);
 void killFIFO(char *pathname);
+
+static void timeout(int sig) {
+	printf("Time OUT!\n");
+	killFIFO(fifoNameHandler);
+	exit(0);
+}
 
 int main(int argc, char *argv[]) {
   printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
@@ -42,12 +51,19 @@ int main(int argc, char *argv[]) {
 	print_args(&args);
 
 	char name[MAX_TOKEN_LEN];
-	sprintf(name, "%'.05d", getpid());
+	char try[MAX_TOKEN_LEN];
+	strcat(try,"%0");
+	char width_pid[10];
+	sprintf(width_pid, "%d", WIDTH_PID);
+	strcat(try, width_pid);
+	strcat(try, "d");
+	sprintf(name, try, getpid());
 	char fifoName[MAX_TOKEN_LEN];
 	strcat(fifoName, "ans");
 	strcat(fifoName, name);
 	
 	createFIFO(fifoName);
+
 
 	//Here only will create the fifo for is PID client
 	//The requests fifos will be created by the server
@@ -75,8 +91,22 @@ int main(int argc, char *argv[]) {
 	strcat(msg, "\0");
 	int msglen = strlen(msg)+1;
 	writeOnFIFO(fd, msg, msglen);
-
 	closeFIFO(fd);
+
+	//waiting for the request from the server
+	fifoNameHandler = fifoName;
+	signal(SIGALRM, timeout);
+	alarm(args.time_out);
+
+	int fd2 = openFIFO(fifoName, O_RDONLY);
+	char str[MAX_TOKEN_LEN];	
+	
+	if(readOnFIFO(fd2, str)) {
+		printf("%s \n", str);
+	}
+	//parse message!!
+	closeFIFO(fd2);
+	killFIFO(fifoName);
 
   return 0;
 }

@@ -46,12 +46,14 @@ void *bilheteira(void *threadId);
 void checkResult(char *string, int err);
 void initSeats(int num);
 void delay(unsigned int mseconds);
+void answerClient(int pid, char *message, int respostaDada);
 
 int isSeatFree(Seat *seats, int seatNum);
 void bookSeat(Seat *seats, int seatNum, int clientId);
 void freeSeat(Seat *seats, int seatNum);
 
 //Globals
+int ALARM_ON = 0;
 Seat seats;
 int conditionMet = 0;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -60,16 +62,9 @@ char *message;
 
 static void ALARMhandler(int sig)
 {
-	int res;
 	printf("Ticket Office Closed!\n");
-	killFIFO(FIFO_NAME_CONNECTION);
-	res = pthread_mutex_unlock(&mutex);
-	checkResult("pthread_mutex_unlock()\n", res);
-	res = pthread_cond_destroy(&cond);
-	checkResult("pthread_cond_destroy()\n", res);
-	res = pthread_mutex_destroy(&mutex);
-	checkResult("pthread_mutex_destroy()\n", res);
-	exit(0);
+	
+	ALARM_ON = 1;
 }
 
 
@@ -114,23 +109,24 @@ int main(int argc, char *argv[]) {
 	alarm(args.open_time);
 
 	//creating FIFO
+	siginterrupt(SIGALRM, 1);
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_RDONLY);
 	sleep(1); //to wait threads for doing something??
 
 	int check = 0;
 	res = pthread_mutex_lock(&mutex); //making everything sleep??
 	checkResult("pthread_mutex_lock()\n", res);
-	while(1) {
+	while(!ALARM_ON) {
 
 		char str[100];
 		if(readOnFIFO(fd, str) && check == 0) {
 			check = 1;
 			printf("%s \n", str);
 		}
-		if(check) {
+		if(check && !ALARM_ON) {
 			message = str;
 			conditionMet = 1;
-			while(conditionMet != 0){
+			while(conditionMet != 0 && !ALARM_ON){
 				res = pthread_cond_broadcast(&cond); //send everyone a message
 				checkResult("pthread_cond_broadcast()\n", res);
 				res = pthread_mutex_unlock(&mutex);
@@ -146,20 +142,29 @@ int main(int argc, char *argv[]) {
 
 	}
 
+	res = pthread_cond_broadcast(&cond);
 
-	//teste
-	/*printf("PID: %d\n", reservation.pid);
-	printf("Number of Wanted Seats: %d\n", reservation.num_wanted_seats);
-	printf("Preferred Seats:");
-	for(size_t i = 0; i < reservation.num_pref_seats; i++) {
-		printf(" %d", reservation.pref_seat_list[i]);
+	for(t=1; t<= args.num_ticket_offices; t++){
+		thrArg[t-1] = t;
+		pthread_join(tid[t-1],NULL);
+		res = pthread_cond_broadcast(&cond);
+		sleep(1);
+		if (rc) {
+			printf("ERROR; return code from pthread_join() is %d\n", rc);
+			exit(1);
+		}
 	}
-	printf("\n");*/
 
+	res = pthread_mutex_unlock(&mutex);
+	checkResult("pthread_mutex_unlock()\n", res);
+	res = pthread_cond_destroy(&cond);
+	checkResult("pthread_cond_destroy()\n", res);
+	res = pthread_mutex_destroy(&mutex);
+	checkResult("pthread_mutex_destroy()\n", res);
 	closeFIFO(fd);
 	killFIFO(FIFO_NAME_CONNECTION);
 
-	  //return 0;
+	return 0;
 }
 
 void read_msg(char *msg, struct client_args_t * args) {
@@ -201,9 +206,12 @@ void *bilheteira(void *threadId) {
 	int threadNum = *(int*)threadId;
  	printf("Ticket Office nº %2d: Created\n", threadNum);
 
+ 	char ans[MAX_TOKEN_LEN];
+
 	//receiving the message
 	int lol = 0;
-	while(1) {
+	int respostaDada = 0;
+	while(!ALARM_ON) {
 		printf("Thread %d blocked because condition is not met\n", threadNum);
 		res = pthread_mutex_lock(&mutex);
 		checkResult("pthread_mutex_lock()\n", res);
@@ -224,10 +232,16 @@ void *bilheteira(void *threadId) {
 			if(data.num_wanted_seats> MAX_CLI_SEATS || data.num_wanted_seats<1){
 									//enviar resposta cliente -1
 									printf("\n\n------ERROR -1-------\n");
+									sprintf(ans, "%d", -1);
+									answerClient(data.pid, ans, respostaDada);
+									respostaDada = 1;
 			}
 			if(data.num_wanted_seats> data.num_pref_seats || data.num_wanted_seats<1){
 									//enviar resposta cliente -4
 									printf("\n\n------ERROR -4--------- \n");
+									sprintf(ans, "%d", -4);
+									answerClient(data.pid, ans, respostaDada);
+									respostaDada = 1;
 			}
 
 			int indexSeats=0;
@@ -249,6 +263,9 @@ void *bilheteira(void *threadId) {
 					if(data.pref_seat_list[indexSeats]> seats.num_room_seats || data.pref_seat_list[indexSeats]<1){
 						//enviar resposta cliente -3
 						printf("\n\n------ERROR -3--------- \n");
+						sprintf(ans, "%d", -3);
+						answerClient(data.pid, ans, respostaDada);
+						respostaDada = 1;
 					}
 
 					if(isSeatFree(&seats , data.pref_seat_list[indexSeats])==0){
@@ -270,10 +287,17 @@ void *bilheteira(void *threadId) {
 			}
 			if(reserveDone){
 				int n;
+				char aux[MAX_TOKEN_LEN];
+				sprintf(ans, "%d", total);
+				strcat(ans, " ");
 				for(n=0;n<total;n++){
+					sprintf(aux, "%d", reserveSeats[n]);
+					strcat(ans, aux);
+					strcat(ans, " ");					
 					printf("RESERVOU: %i\n",reserveSeats[n]);
 					//enviar mensagem de sucesso cliente
 				}
+				answerClient(data.pid, ans, respostaDada);
 					printf("\n\n");
 			}
 			else{
@@ -281,10 +305,16 @@ void *bilheteira(void *threadId) {
 				if(total== 0){
 					//enviar resposta cliente -6
 					printf("\n\n------ERROR -6--------- \n");
+					sprintf(ans, "%d", -6);
+					answerClient(data.pid, ans, respostaDada);
+					respostaDada = 1;
 				}
 				else{
 					//enviar resposta cliente -5
 					printf("\n\n------ERROR -5--------- \n");
+					sprintf(ans, "%d", -5);
+					answerClient(data.pid, ans, respostaDada);
+					respostaDada = 1;
 					int ni;
 					for(ni=0;ni<total;ni++){
 					printf("Lugar %i reservado, irá ser apagado\n",reserveSeats[ni]);
@@ -305,25 +335,14 @@ void *bilheteira(void *threadId) {
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
 			//FIM ZONA CRÍTICA!!!
-			sleep(1);
 			printf("\n\n*************RECEBEU**********************\n");
 			printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
 			printf("******************************************\n\n\n");
 
-			DELAY(7000);
+			
 			printf("CLIENTE PROCESSADO \n");
 
-			//creating name to write message
-			char name[MAX_TOKEN_LEN];
-			sprintf(name, "%'.05d", data.pid);
-			char fifoName[MAX_TOKEN_LEN];
-			strcat(fifoName, "ans");
-			strcat(fifoName, name);
-			
-			int msglen = strlen(fifoName)+1;
 
-			int fd = openFIFO(fifoName, O_WRONLY);
-			writeOnFIFO(fd, fifoName, msglen);
 		}
 		if(lol == 1){
 			lol = 0;
@@ -331,8 +350,42 @@ void *bilheteira(void *threadId) {
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
 		}
-		
+		DELAY(5);
+		respostaDada = 0;
 	}
+
+	printf("FECHEI %d! \n", threadNum);
+
+	return NULL;
+}
+
+void answerClient(int pid, char *message, int respostaDada) {
+	if(!respostaDada) {
+		char name[MAX_TOKEN_LEN];
+		char try[MAX_TOKEN_LEN];
+		name[0] = '\0';
+		try[0] = '\0';
+		strcat(try,"%0");
+		char width_pid[10];
+		sprintf(width_pid, "%d", WIDTH_PID);
+		strcat(try, width_pid);
+		strcat(try, "d");
+		sprintf(name, try, pid);
+		char fifoName[MAX_TOKEN_LEN];
+		fifoName[0] = '\0';
+		strcat(fifoName, "ans");
+		strcat(fifoName, name);
+
+		printf("%s\n", fifoName);
+		
+		int msglen = strlen(message)+1;
+
+		int fd = openFIFO(fifoName, O_WRONLY);
+		writeOnFIFO(fd, message, msglen);
+
+		printf("RESPOTA DADA: %s ao: %s \n", message, name);
+	}
+	
 }
 
 void checkResult(char *string, int err) {
@@ -359,8 +412,11 @@ int openFIFO(const char *pathname, mode_t mode) {
 	int fd = open(pathname, mode);
 	if(fd == -1) {
 		printf("ERROR: COULDNT OPEN FIFO\n");
+		killFIFO(FIFO_NAME_CONNECTION);
+		exit(0);
 	}
 	return fd;
+
 }
 
 void writeOnFIFO(int fd, char *message, int messagelen) {
@@ -372,6 +428,9 @@ void writeOnFIFO(int fd, char *message, int messagelen) {
 
 int readOnFIFO(int fd, char *str) {
 	int n;
+	//struct sigaction int_handler = {.sa_handler=ALARMhandler};
+  	//sigaction(SIGALRM,&int_handler,1);
+  	siginterrupt(SIGALRM, 1);
 	do {
 		n = read(fd,str,1);
 	} while (n>0 && *str++ != '\0');
@@ -404,23 +463,22 @@ int isSeatFree(Seat *seats, int seatNum){//caso esteja livre o valor que aparece
 		return 0;
 	}
 	else return seats->seats_taken[seatNum];
-	delay(1000);
+	delay(1);
 }
 
 void bookSeat(Seat *seats, int seatNum, int clientId){
 	
 	seats->seats_taken[seatNum]=clientId;
-	delay(1000);
+	delay(1);
 }
 
 void freeSeat(Seat *seats, int seatNum){
 	seats->seats_taken[seatNum]=0;
-	delay(1000);
+	delay(1);
 }
 
 void delay(unsigned int mseconds)
 {
-    clock_t goal = mseconds + clock();
-    while (goal > clock());
+    sleep(mseconds);
 }
 
