@@ -22,6 +22,7 @@
 #define MAX_WAITING_LIST 10
 #define SHARED 0						 /* sem. is shared between threads */
 
+#define DELAY(x) delay(x)
 
 // para bilheteiras
 #define FIFO_NAME_CONNECTION "requests"

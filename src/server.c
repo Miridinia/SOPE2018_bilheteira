@@ -10,6 +10,7 @@
 #include <mqueue.h>
 #include <semaphore.h>
 #include <errno.h>
+#include <time.h>
 
 #include "ticket.h"
 // $ server <num_room_seats> <num_ticket_offices> <open_time>
@@ -44,6 +45,7 @@ void killFIFO(char *pathname);
 void *bilheteira(void *threadId);
 void checkResult(char *string, int err);
 void initSeats(int num);
+void delay(unsigned int mseconds);
 
 int isSeatFree(Seat *seats, int seatNum);
 void bookSeat(Seat *seats, int seatNum, int clientId);
@@ -304,18 +306,32 @@ void *bilheteira(void *threadId) {
 			checkResult("pthread_mutex_unlock()\n", res);
 			//FIM ZONA CRÍTICA!!!
 			sleep(1);
-				printf("\n\n*************RECEBEU**********************\n");
-				printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
-				printf("******************************************\n\n\n");
+			printf("\n\n*************RECEBEU**********************\n");
+			printf("bilheteira: %i, recebeu %i\n", threadNum, data.pid);
+			printf("******************************************\n\n\n");
 
+			DELAY(7000);
+			printf("CLIENTE PROCESSADO \n");
+
+			//creating name to write message
+			char name[MAX_TOKEN_LEN];
+			sprintf(name, "%'.05d", data.pid);
+			char fifoName[MAX_TOKEN_LEN];
+			strcat(fifoName, "ans");
+			strcat(fifoName, name);
+			
+			int msglen = strlen(fifoName)+1;
+
+			int fd = openFIFO(fifoName, O_WRONLY);
+			writeOnFIFO(fd, fifoName, msglen);
 		}
 		if(lol == 1){
 			lol = 0;
 		}	else {
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
-			sleep(1);
 		}
+		
 	}
 }
 
@@ -384,20 +400,27 @@ void initSeats(int num){ //inicializar a 0 o array com num de comprimento
 }
 
 int isSeatFree(Seat *seats, int seatNum){//caso esteja livre o valor que aparece é 0, se estiver ocupado aparece o clienteId
-	sleep(1);
 	if(seats->seats_taken[seatNum]==0){
 		return 0;
 	}
 	else return seats->seats_taken[seatNum];
+	delay(1000);
 }
 
 void bookSeat(Seat *seats, int seatNum, int clientId){
-	sleep(1);
+	
 	seats->seats_taken[seatNum]=clientId;
+	delay(1000);
 }
 
 void freeSeat(Seat *seats, int seatNum){
-	sleep(1);
 	seats->seats_taken[seatNum]=0;
+	delay(1000);
+}
+
+void delay(unsigned int mseconds)
+{
+    clock_t goal = mseconds + clock();
+    while (goal > clock());
 }
 

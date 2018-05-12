@@ -41,6 +41,14 @@ int main(int argc, char *argv[]) {
 	parse_args(argv, &args);
 	print_args(&args);
 
+	char name[MAX_TOKEN_LEN];
+	sprintf(name, "%'.05d", getpid());
+	char fifoName[MAX_TOKEN_LEN];
+	strcat(fifoName, "ans");
+	strcat(fifoName, name);
+	
+	createFIFO(fifoName);
+
 	//Here only will create the fifo for is PID client
 	//The requests fifos will be created by the server
 	int fd = openFIFO(FIFO_NAME_CONNECTION, O_WRONLY);
