@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/file.h> 
+#include <sys/file.h>
 #include <signal.h>
 
 #include "ticket.h"
@@ -19,7 +19,8 @@ struct client_args_t {
 	int num_pref_seats;
 };
 
-char * fifoNameHandler;
+
+
 
 void parse_args(char *argv[], struct client_args_t * args);
 void print_args(struct client_args_t * args);
@@ -29,6 +30,10 @@ void writeOnFIFO(int fd, char *message, int messagelen);
 int readOnFIFO(int fd, char *str);
 void closeFIFO(int fd);
 void killFIFO(char *pathname);
+
+char * fifoNameHandler;
+FILE *fp3;
+FILE *fp4;
 
 static void timeout(int sig) {
 	printf("Time OUT!\n");
@@ -45,7 +50,10 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	struct client_args_t args; 
+	fp3 =fopen("clog.txt","w+");
+	fp4 =fopen("cbook.txt","w+");
+
+	struct client_args_t args;
 
 	parse_args(argv, &args);
 	print_args(&args);
@@ -61,7 +69,7 @@ int main(int argc, char *argv[]) {
 	char fifoName[MAX_TOKEN_LEN];
 	strcat(fifoName, "ans");
 	strcat(fifoName, name);
-	
+
 	createFIFO(fifoName);
 
 
@@ -80,7 +88,7 @@ int main(int argc, char *argv[]) {
 	sprintf(num_wanted_seats, "%d", args.num_wanted_seats);
 	strcat(msg, num_wanted_seats);
 
-	
+
 	int i;
 	for(i=0; i<args.num_pref_seats; i++) {
 		strcat(msg, " ");
@@ -99,12 +107,46 @@ int main(int argc, char *argv[]) {
 	alarm(args.time_out);
 
 	int fd2 = openFIFO(fifoName, O_RDONLY);
-	char str[MAX_TOKEN_LEN];	
-	
+	char str[MAX_TOKEN_LEN];
+
 	if(readOnFIFO(fd2, str)) {
+
 		printf("%s \n", str);
 	}
+
 	//parse message!!
+ char *token = strtok(str," ");
+ 	printf("%s \n", token);
+	int a=atoi(token);
+
+ if(a == -1){
+	 fprintf(fp3, "MAX\n");
+ }
+ else if(a == -2){
+	 fprintf(fp3, "NST\n");
+ }
+ else if(a==-3){
+	 fprintf(fp3, "IID\n");
+ }
+ else if(a==-4){
+	 fprintf(fp3, "ERR\n");
+ }
+ else if(a==-5){
+	 fprintf(fp3, "NAV\n");
+ }
+ else if(a==-6){
+	 fprintf(fp3, "FUL\n");
+ }
+ else{
+	 int i;
+	 int n=atoi(token);
+	 for(i=0;i<n;i++){
+		token = strtok(NULL," ");
+		fprintf(fp3, "%02d.%02d %04d\n",i+1,n,atoi(token));
+		fprintf(fp4, "%04d\n",atoi(token));
+	 }
+ }
+
 	closeFIFO(fd2);
 	killFIFO(fifoName);
 
@@ -137,11 +179,11 @@ void createFIFO(const char *pathname) {
 	if(mkfifo(pathname , PERMISSIONS_FIFO) != 0){
 		printf("ERROR: COULDN'T CREATE FIFO\n");
 		exit(0);
-	}	
+	}
 }
 
 int openFIFO(const char *pathname, mode_t mode) {
-	int fd = open(pathname, mode); 
+	int fd = open(pathname, mode);
 	if(fd == -1) {
 		printf("ERROR: COULDNT OPEN FIFO\n");
 	}
@@ -157,12 +199,12 @@ void writeOnFIFO(int fd, char *message, int messagelen) {
 }
 
 int readOnFIFO(int fd, char *str) {
-	int n; 
+	int n;
 	do {
-		n = read(fd,str,1);     
-	} while (n>0 && *str++ != '\0'); 
+		n = read(fd,str,1);
+	} while (n>0 && *str++ != '\0');
 
-	return (n>0); 
+	return (n>0);
 }
 
 void closeFIFO(int fd) {
