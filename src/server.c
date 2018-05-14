@@ -76,7 +76,7 @@ static void ALARMhandler(int sig)
 int main(int argc, char *argv[]) {
 	printf("** Running process %d (PGID %d) **\n", getpid(), getpgrp());
 	int res; //????
-	killFIFO(FIFO_NAME_CONNECTION);
+
 	if (argc == 4) {
 		printf("ARGS: %s | %s | %s\n", argv[1], argv[2], argv[3]);
 	} else {
@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
 	res = pthread_cond_destroy(&cond);
 	checkResult("pthread_cond_destroy()\n", res);
 	res = pthread_mutex_destroy(&mutex);
-	checkResult("pthread_mutex_destroy()\n", res);
+	//checkResult("pthread_mutex_destroy()\n", res);
 	closeFIFO(fd);
 	killFIFO(FIFO_NAME_CONNECTION);
 
@@ -448,8 +448,6 @@ int openFIFO(const char *pathname, mode_t mode) {
 	int fd = open(pathname, mode);
 	if(fd == -1) {
 		printf("ERROR: COULDNT OPEN FIFO\n");
-		//killFIFO(FIFO_NAME_CONNECTION);
-		//exit(0);
 	}
 	return fd;
 
@@ -477,7 +475,7 @@ int readOnFIFO(int fd, char *str) {
 void closeFIFO(int fd) {
 	if(close(fd) < 0) {
 		printf("ERROR: COULDN'T CLOSE FIFO\n");
-		exit(0);
+		//exit(0);
 	}
 }
 
