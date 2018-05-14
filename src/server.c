@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 	print_args(&args);
 
 	//create File logs.txt e sbook.txt
-	fp1 =fopen("logs.txt","w+");
+	fp1 =fopen("slog.txt","w+");
 	fp2 =fopen("sbook.txt","w+");
 
 
@@ -256,11 +256,12 @@ void *bilheteira(void *threadId) {
 			for(np=0;np<data.num_pref_seats;np++){
 				fprintf(fp1, "%04d ",data.pref_seat_list[np]);
 			}
-			fprintf(fp1, " - ");
+			fprintf(fp1, "- ");
 
 			if(data.num_wanted_seats> MAX_CLI_SEATS || data.num_wanted_seats<1){
 									//enviar resposta cliente -1
 									fprintf(fp1,"MAX");
+									fprintf(fp1,"\n");
 									printf("\n\n------ERROR -1-------\n");
 									sprintf(ans, "%d", -1);
 									answerClient(data.pid, ans, respostaDada);
@@ -269,6 +270,7 @@ void *bilheteira(void *threadId) {
 			if(data.num_wanted_seats> data.num_pref_seats || data.num_wanted_seats<1){
 									//enviar resposta cliente -4
 									fprintf(fp1,"NST");
+									fprintf(fp1,"\n");
 									printf("\n\n------ERROR -2--------- \n");
 									sprintf(ans, "%d", -2);
 									answerClient(data.pid, ans, respostaDada);
@@ -294,6 +296,7 @@ void *bilheteira(void *threadId) {
 					if(data.pref_seat_list[indexSeats]> seats.num_room_seats || data.pref_seat_list[indexSeats]<1){
 						//enviar resposta cliente -3
 						fprintf(fp1,"IID");
+						fprintf(fp1,"\n");
 						printf("\n\n------ERROR -3--------- \n");
 						sprintf(ans, "%d", -3);
 						answerClient(data.pid, ans, respostaDada);
@@ -330,14 +333,16 @@ void *bilheteira(void *threadId) {
 					printf("RESERVOU: %i\n",reserveSeats[n]);
 					//enviar mensagem de sucesso cliente
 				}
+				fprintf(fp1,"\n");
 				answerClient(data.pid, ans, respostaDada);
-					printf("\n\n");
+				printf("\n\n");
 			}
 			else{
 				printf("NAO RESERVOU\n");
 				if(total== 0){
 					//enviar resposta cliente -6
 					fprintf(fp1,"FUL");
+					fprintf(fp1,"\n");
 					printf("\n\n------ERROR -6--------- \n");
 					sprintf(ans, "%d", -6);
 					answerClient(data.pid, ans, respostaDada);
@@ -346,6 +351,7 @@ void *bilheteira(void *threadId) {
 				else{
 					//enviar resposta cliente -5
 					fprintf(fp1,"NAV");
+					fprintf(fp1,"\n");
 					printf("\n\n------ERROR -5--------- \n");
 					sprintf(ans, "%d", -5);
 					answerClient(data.pid, ans, respostaDada);
@@ -356,6 +362,7 @@ void *bilheteira(void *threadId) {
 					freeSeat(&seats,reserveSeats[ni]);
 				}
 				}
+
 					printf("\n\n");
 			}
 			indexSeats=0;
@@ -365,7 +372,6 @@ void *bilheteira(void *threadId) {
 			reserveDone=0; //bool
 
 			free(reserveSeats);
-			fprintf(fp1,"\n");
 			lol = 1;
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
@@ -376,7 +382,7 @@ void *bilheteira(void *threadId) {
 
 
 			printf("CLIENTE PROCESSADO \n");
-
+			DELAY(5);
 
 		}
 		if(lol == 1){
@@ -385,7 +391,6 @@ void *bilheteira(void *threadId) {
 			res = pthread_mutex_unlock(&mutex);
 			checkResult("pthread_mutex_unlock()\n", res);
 		}
-		DELAY(5);
 		respostaDada = 0;
 	}
 
@@ -456,7 +461,7 @@ int openFIFO(const char *pathname, mode_t mode) {
 void writeOnFIFO(int fd, char *message, int messagelen) {
 	if(write(fd,message,messagelen) != messagelen) {
 		printf("ERROR: COULDN'T WRITE ON FIFO\n");
-		exit(0);
+		//exit(0);
 	}
 }
 
@@ -520,8 +525,9 @@ void printallSeats(Seat *seats,int n){
 	int i;
 	for(i=0;i<n;i++){
 		if(seats->seats_taken[i] != 0){
-			fprintf(fp2,"%04d\n",i+1);
+			fprintf(fp2,"%04d\n",i);
 		}
 	}
 }
+
 
