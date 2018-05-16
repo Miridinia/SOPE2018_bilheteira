@@ -124,8 +124,6 @@ int main(int argc, char *argv[]) {
 	sleep(1); //to wait threads for doing something??
 
 	int check = 0;
-	res = pthread_mutex_lock(&mutex); //making everything sleep??
-	checkResult("pthread_mutex_lock()\n", res);
 	while(!ALARM_ON) {
 
 		char str[100];
@@ -139,11 +137,8 @@ int main(int argc, char *argv[]) {
 			while(conditionMet != 0 && !ALARM_ON){
 				res = pthread_cond_broadcast(&cond); //send everyone a message
 				checkResult("pthread_cond_broadcast()\n", res);
-				res = pthread_mutex_unlock(&mutex);
-				checkResult("pthread_mutex_unlock()\n", res);
 				if(conditionMet != 0) {
-					res = pthread_mutex_lock(&mutex); //making everything sleep??
-					checkResult("pthread_mutex_lock()\n", res);
+
 				}
 				//printf("esperando...\n");
 			}
@@ -156,26 +151,19 @@ int main(int argc, char *argv[]) {
 
 
 	res = pthread_cond_broadcast(&cond);
-	res = pthread_mutex_unlock(&mutex);
-	checkResult("pthread_mutex_unlock()\n",res);
+	checkResult("pthread_cond_broadcast()\n",res);
 
 	for(t=1; t<= args.num_ticket_offices; t++){
 		thrArg[t-1] = t;
 		pthread_join(tid[t-1],NULL);
-		res = pthread_cond_broadcast(&cond);
-		sleep(1);
 		if (rc) {
 			printf("ERROR; return code from pthread_join() is %d\n", rc);
 			exit(1);
 		}
 	}
 
-	res = pthread_mutex_unlock(&mutex);
-	checkResult("pthread_mutex_unlock()\n", res);
 	res = pthread_cond_destroy(&cond);
 	checkResult("pthread_cond_destroy()\n", res);
-	res = pthread_mutex_destroy(&mutex);
-	//checkResult("pthread_mutex_destroy()\n", res);
 	closeFIFO(fd);
 	killFIFO(FIFO_NAME_CONNECTION);
 
@@ -239,12 +227,11 @@ void *bilheteira(void *threadId) {
 		checkResult("pthread_mutex_lock()\n", res);
 		res = pthread_cond_wait(&cond, &mutex);
 		checkResult("pthread_cond_wait()\n", res);
+		res = pthread_mutex_unlock(&mutex);
+		checkResult("pthread_mutex_lock()\n", res);
 		if(conditionMet == 1) {
 			//ZONA CRíTICA!!!!!!
 			printf("Thread %d executing critical section for 1 seconds ...\n",threadNum);
-			res = pthread_mutex_unlock(&mutex);
-			checkResult("pthread_mutex_unlock()\n", res);
-
 			res = pthread_mutex_lock(&mutex);
 			checkResult("pthread_mutex_lock()\n", res);
 			conditionMet = 0;
@@ -382,7 +369,7 @@ void *bilheteira(void *threadId) {
 
 
 			printf("CLIENTE PROCESSADO \n");
-			DELAY(5);
+			DELAY(1);
 
 		}
 		if(lol == 1){
