@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
 	print_args(&args);
 
 	//create File logs.txt e sbook.txt
-	fp1 =fopen("slog.txt","w+");
-	fp2 =fopen("sbook.txt","w+");
+	fp1 =fopen("slog.txt","a+");
+	fp2 =fopen("sbook.txt","a+");
 
 
 	//define Seat
