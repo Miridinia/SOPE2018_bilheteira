@@ -34,6 +34,7 @@ void killFIFO(char *pathname);
 char * fifoNameHandler;
 FILE *fp3;
 FILE *fp4;
+char * name;
 
 static void timeout(int sig) {
 	printf("Time OUT!\n");
@@ -50,8 +51,8 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	fp3 =fopen("clog.txt","w+");
-	fp4 =fopen("cbook.txt","w+");
+	fp3 =fopen("clog.txt","a+");
+	fp4 =fopen("cbook.txt","a+");
 
 	struct client_args_t args;
 
@@ -120,29 +121,29 @@ int main(int argc, char *argv[]) {
 	int a=atoi(token);
 
  if(a == -1){
-	 fprintf(fp3, "MAX\n");
+	 fprintf(fp3, "%sMAX\n",name);
  }
  else if(a == -2){
-	 fprintf(fp3, "NST\n");
+	 fprintf(fp3, "%sNST\n",name);
  }
  else if(a==-3){
-	 fprintf(fp3, "IID\n");
+	 fprintf(fp3, "%sIID\n",name);
  }
  else if(a==-4){
-	 fprintf(fp3, "ERR\n");
+	 fprintf(fp3, "%sERR\n",name);
  }
  else if(a==-5){
-	 fprintf(fp3, "NAV\n");
+	 fprintf(fp3, "%s NAV\n",name);
  }
  else if(a==-6){
-	 fprintf(fp3, "FUL\n");
+	 fprintf(fp3, "%sFUL\n",name);
  }
  else{
 	 int i;
 	 int n=atoi(token);
 	 for(i=0;i<n;i++){
 		token = strtok(NULL," ");
-		fprintf(fp3, "%02d.%02d %04d\n",i+1,n,atoi(token));
+		fprintf(fp3, "%s %02d.%02d %04d\n",name, i+1,n,atoi(token));
 		fprintf(fp4, "%04d\n",atoi(token));
 	 }
  }
